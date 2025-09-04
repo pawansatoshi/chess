@@ -2,183 +2,258 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Monad Chess Testnet</title>
+<title>Monad Testnet Chess</title>
 <style>
-  body {
-    font-family: Arial, "Segoe UI Symbol", "Noto Sans Symbols", sans-serif;
-    background: url('your_background_image.png') no-repeat center center fixed;
-    background-size: cover;
-    color: #eee;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    padding: 20px;
-    position: relative;
-  }
-  #board { 
-    display: grid; 
-    grid-template-columns: repeat(8, 50px); 
-    grid-template-rows: repeat(8, 50px); 
-    gap: 0; 
-    margin-bottom: 20px; 
-  }
-  .square { 
-    width: 50px; height: 50px; 
-    display: flex; justify-content: center; align-items: center; 
-    font-size: 36px; cursor: pointer; 
-  }
-  .white { background-color: #f0d9b5; }
-  .black { background-color: #b58863; }
-  button { 
-    margin: 5px; padding: 10px 15px; font-size: 16px; cursor: pointer; 
-    border-radius: 5px; border: none; background: #4CAF50; color: #fff; 
-  }
-  button:disabled { background: #555; cursor: not-allowed; }
-  #moves, #leaderboard { margin-top: 15px; max-width: 400px; width: 100%; word-break: break-word; }
-  #socials a { margin: 0 5px; text-decoration: none; font-weight: bold; }
-  #socials { margin-top: 20px; text-align: center; }
-  img.logo { width: 80px; position: absolute; top: 10px; }
-  #monadLogo { left: 10px; }
-  #foxLogo { right: 10px; }
+body {
+  font-family: Arial, sans-serif;
+  background-color: #0a0a0a;
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 20px;
+}
+.header {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+.header img { height: 60px; }
+h1 { font-size: 28px; }
+#board { width: 400px; margin-bottom: 20px; }
+.controls button {
+  padding: 10px 20px;
+  margin: 5px;
+  background-color: #1a73e8;
+  border: none;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 8px;
+}
+.controls button:hover { background-color: #155ab6; }
+#status { margin-top: 10px; }
+.socials button {
+  padding: 8px 16px;
+  margin: 5px;
+  background-color: #00acee;
+  border: none;
+  color: #fff;
+  font-weight: bold;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.socials button:hover { background-color: #0077b5; }
+.socials span { display: inline-block; margin: 5px; font-weight: bold; }
 </style>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard.js/1.0.0/css/chessboard.min.css">
 </head>
 <body>
 
-<img src="monad_logo.png" id="monadLogo" class="logo" alt="Monad Logo">
-<img src="fox_logo.png" id="foxLogo" class="logo" alt="Fox Logo">
+<div class="header">
+  <img src="monad_logo.png" alt="Monad Logo">
+  <h1>Monad Testnet Chess</h1>
+  <img src="fox_logo.png" alt="Fox Logo">
+</div>
 
-<h1>Monad Chess Testnet ♟️</h1>
+<div class="socials">
+  <button onclick="window.open('https://t.me/pawansatoshiji','_blank')">Telegram</button>
+  <button onclick="window.open('https://youtube.com/@PawanSatoshi','_blank')">YouTube</button>
+  <button onclick="window.open('https://x.com/pawansatoshix','_blank')">X</button>
+  <span>Discord: @pawansatoshi</span>
+</div>
 
 <div id="board"></div>
 
-<div>
-  <button id="connectWallet">Connect Wallet</button>
-  <button id="createGame" disabled>Create Game</button>
-  <button id="joinGame" disabled>Join Game (AI)</button>
-  <button id="undoMove" disabled>Undo Last Move</button>
+<div class="controls">
+  <button id="connectBtn">Connect Wallet</button>
+  <button id="addNetworkBtn">Add Monad Testnet</button>
+  <button id="startBtn">Start New Game</button>
+  <button id="joinBtn">Join Game as Black</button>
+  <button id="aiMoveBtn">AI Move</button>
+  <button id="resetBtn">Reset Board</button>
 </div>
+<div id="status">Connect your wallet to start</div>
 
-<div id="moves">Moves:</div>
-<div id="leaderboard">Leaderboard:</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard.js/1.0.0/js/chessboard.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.min.js"></script>
 
-<div id="socials">
-  <a href="https://t.me/pawansatoshiji" target="_blank" style="color:#0088cc;">Telegram</a> |
-  <a href="https://youtube.com/@PawanSatoshi" target="_blank" style="color:#FF0000;">YouTube</a> |
-  <a href="https://x.com/pawansatoshix" target="_blank" style="color:#1DA1F2;">X</a> |
-  <a href="https://discord.com/users/pawansatoshi" target="_blank" style="color:#7289DA;">Discord</a>
-</div>
-
-<script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js"></script>
 <script>
-const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
-const contractABI = [ /* ABI here as before */ ];
+// === Chess pieces base64 placeholders ===
+const pieceBase64 = {
+  wP:'data:image/svg+xml;base64,...', bP:'data:image/svg+xml;base64,...',
+  wR:'data:image/svg+xml;base64,...', bR:'data:image/svg+xml;base64,...',
+  wN:'data:image/svg+xml;base64,...', bN:'data:image/svg+xml;base64,...',
+  wB:'data:image/svg+xml;base64,...', bB:'data:image/svg+xml;base64,...',
+  wQ:'data:image/svg+xml;base64,...', bQ:'data:image/svg+xml;base64,...',
+  wK:'data:image/svg+xml;base64,...', bK:'data:image/svg+xml;base64,...'
+};
 
-let provider, signer, contract, currentGameId;
-let board = [];
-let selected = null;
-let movesLog = [];
+const game = new Chess();
+let board = null;
+let provider, signer, contract;
+const contractAddress = '0x927E5DF0b0a5971cA625051C4116A2515525dCEb';
 
-function initBoard() {
-  board = [];
-  const boardDiv = document.getElementById('board');
-  boardDiv.innerHTML = '';
-  const rows = 8, cols = 8;
-  const initialPieces = [
-    ["♜","♞","♝","♛","♚","♝","♞","♜"],
-    ["♟","♟","♟","♟","♟","♟","♟","♟"],
-    ["","","","","","","",""],
-    ["","","","","","","",""],
-    ["","","","","","","",""],
-    ["","","","","","","",""],
-    ["♙","♙","♙","♙","♙","♙","♙","♙"],
-    ["♖","♘","♗","♕","♔","♗","♘","♖"]
-  ];
-  for(let r=0;r<rows;r++){
-    let rowArr = [];
-    for(let c=0;c<cols;c++){
-      const square = document.createElement('div');
-      square.className = ((r+c)%2===0)?"square white":"square black";
-      square.textContent = initialPieces[r][c];
-      square.onclick = () => handleClick(square, r, c);
-      boardDiv.appendChild(square);
-      rowArr.push(square);
-    }
-    board.push(rowArr);
-  }
-  updateLeaderboard();
-}
+// === Full ABI ===
+const contractABI = [
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},
+      {"indexed": true,"internalType": "address","name": "white","type": "address"}
+    ],
+    "name": "GameCreated","type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},
+      {"indexed": true,"internalType": "address","name": "winner","type": "address"}
+    ],
+    "name": "GameFinished","type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},
+      {"indexed": true,"internalType": "address","name": "player","type": "address"},
+      {"indexed": false,"internalType": "string","name": "move","type": "string"},
+      {"indexed": false,"internalType": "uint256","name": "moveIndex","type": "uint256"},
+      {"indexed": false,"internalType": "uint8","name": "nextTurn","type": "uint8"}
+    ],
+    "name": "MoveSubmitted","type": "event"
+  },
+  {
+    "anonymous": false,
+    "inputs": [
+      {"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},
+      {"indexed": true,"internalType": "address","name": "black","type": "address"}
+    ],
+    "name": "PlayerJoined","type": "event"
+  },
+  {
+    "inputs": [], "name": "createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],
+    "stateMutability":"nonpayable","type":"function"
+  },
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],
+    "name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
+];
 
-function handleClick(square, r, c) {
-  if(selected){
-    if(selected !== square){
-      const move = `${selected.textContent} ${r},${c}`;
-      board[r][c].textContent = selected.textContent;
-      selected.textContent = "";
-      movesLog.push(move);
-      document.getElementById('moves').textContent = "Moves: " + movesLog.join(", ");
-      // Placeholder: submit move to contract
-      // contract.submitMove(currentGameId, move);
-    }
-    selected = null;
-  } else if(square.textContent){
-    selected = square;
-  }
-}
+// === Chessboard.js config ===
+const config = {
+  draggable:true,
+  position:'start',
+  onDragStart:(source,piece)=>{
+    if(game.game_over()) return false;
+    if((game.turn()==='w' && piece.search(/^b/)!==-1) || (game.turn()==='b' && piece.search(/^w/)!==-1)) return false;
+  },
+  onDrop:(source,target)=>{
+    const move = game.move({from:source,to:target,promotion:'q'});
+    if(move===null) return 'snapback';
+    submitMoveOnChain(move);
+  },
+  onSnapEnd:()=>{board.position(game.fen());},
+  pieceTheme:piece=>pieceBase64[piece]
+};
+let board = Chessboard('board',config);
 
+// ===== Wallet + RPC =====
 async function connectWallet() {
-  if(!window.ethereum) return alert("Install MetaMask!");
-  provider = new ethers.BrowserProvider(window.ethereum);
-  await provider.send("eth_requestAccounts", []);
-  signer = await provider.getSigner();
-  contract = new ethers.Contract(contractAddress, contractABI, signer);
-  document.getElementById('createGame').disabled = false;
-  document.getElementById('joinGame').disabled = false;
-  initBoard();
+  if(window.ethereum){
+    provider = new ethers.providers.Web3Provider(window.ethereum);
+    await provider.send("eth_requestAccounts", []);
+    signer = provider.getSigner();
+    contract = new ethers.Contract(contractAddress, contractABI, signer);
+    const address = await signer.getAddress();
+    document.getElementById('status').innerText = 'Wallet connected: ' + address;
+  } else {
+    provider = new ethers.providers.JsonRpcProvider("https://testnet-rpc.monad.xyz");
+    contract = new ethers.Contract(contractAddress, contractABI, provider);
+    document.getElementById('status').innerText = 'Connected via Monad Testnet RPC (read-only)';
+  }
 }
 
-async function createGame() {
+// Add Monad Testnet to wallet
+async function addMonadTestnetToWallet() {
+  if(!window.ethereum) return;
+  try {
+    await window.ethereum.request({
+      method: 'wallet_addEthereumChain',
+      params: [{
+        chainId: '0x27bf', 
+        chainName: 'Monad Testnet',
+        rpcUrls: ['https://testnet-rpc.monad.xyz'],
+        nativeCurrency: { name: 'MON', symbol: 'MON', decimals: 18 },
+        blockExplorerUrls: ['https://testnet.monadexplorer.com']
+      }]
+    });
+    document.getElementById('status').innerText = 'Monad Testnet added to wallet!';
+  } catch(e){ console.error(e); }
+}
+
+// ===== Game Actions =====
+document.getElementById('startBtn').addEventListener('click', async ()=>{
+  if(!contract) await connectWallet();
+  if(!signer){ alert('Wallet required to create a game'); return; }
   const tx = await contract.createGame();
   const receipt = await tx.wait();
-  const event = receipt.events.find(e => e.event === "GameCreated");
-  currentGameId = event.args.gameId;
-  alert(`Game created with ID: ${currentGameId}`);
-  document.getElementById('undoMove').disabled = false;
-  updateLeaderboard();
-}
+  const event = receipt.events.find(e=>e.event==='GameCreated');
+  const gameId = event.args.gameId.toString();
+  document.getElementById('status').innerText = 'Game created: ' + gameId;
+});
 
-async function joinGame() {
-  if(!currentGameId) currentGameId = (await contract.nextGameId()) - 1;
-  try {
-    await contract.joinGame(currentGameId);
-    alert("Joined Game as Black ✅");
-    document.getElementById('undoMove').disabled = false;
-    updateLeaderboard();
-  } catch(err) {
-    alert("Error joining game: " + err.message);
+document.getElementById('joinBtn').addEventListener('click', async ()=>{
+  if(!contract) await connectWallet();
+  if(!signer){ alert('Wallet required to join a game'); return; }
+  const gameId = prompt('Enter Game ID to join');
+  if(gameId){
+    const tx = await contract.joinGame(gameId);
+    await tx.wait();
+    document.getElementById('status').innerText = 'Joined game ' + gameId + ' as Black';
   }
+});
+
+// AI move placeholder (random, will upgrade to Stockfish later)
+document.getElementById('aiMoveBtn').addEventListener('click', async ()=>{
+  if(game.game_over()){ alert('Game over'); return; }
+  const moves = game.moves();
+  const move = moves[Math.floor(Math.random()*moves.length)];
+  game.move(move);
+  board.position(game.fen());
+  submitMoveOnChain({san: move});
+});
+
+// Reset board
+document.getElementById('resetBtn').addEventListener('click', ()=>{game.reset(); board.start();});
+
+// Submit move to blockchain
+async function submitMoveOnChain(move){
+  if(!contract) return;
+  if(!signer){ console.log('Cannot submit move without wallet'); return; }
+  const gameId = prompt('Enter Game ID for this move');
+  if(!gameId) return;
+  await contract.submitMove(gameId, move.san);
 }
 
-function undoMove() {
-  alert("Undo feature requires smart contract support.");
+// Listen events
+async function listenEvents(){
+  if(!contract) return;
+  contract.on('MoveSubmitted',(gameId,player,move,moveIndex,nextTurn)=>{
+    console.log('MoveSubmitted', gameId.toString(), player, move, moveIndex, nextTurn);
+  });
+  contract.on('GameFinished',(gameId,winner)=>{
+    alert('Game ' + gameId.toString() + ' finished. Winner: ' + winner);
+  });
 }
+listenEvents();
 
-async function updateLeaderboard() {
-  if(!contract || !currentGameId) return;
-  try {
-    const players = await contract.getPlayers(currentGameId);
-    document.getElementById('leaderboard').textContent = `Leaderboard: White: ${players.white}, Black: ${players.black}`;
-  } catch {
-    document.getElementById('leaderboard').textContent = "Leaderboard: Waiting for game...";
-  }
-}
-
-document.getElementById('connectWallet').onclick = connectWallet;
-document.getElementById('createGame').onclick = createGame;
-document.getElementById('joinGame').onclick = joinGame;
-document.getElementById('undoMove').onclick = undoMove;
-
-initBoard();
-</script>
-</body>
-	</html>
+// Buttons
+document.getElementById('connectBtn').addEventListener('
