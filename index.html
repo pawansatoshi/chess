@@ -1,0 +1,99 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Chess DApp</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    body { font-family: sans-serif; text-align: center; padding: 10px; }
+    table { margin: 20px auto; border-collapse: collapse; }
+    td {
+      width: 40px; height: 40px; text-align: center; vertical-align: middle;
+      border: 1px solid #333; font-size: 20px; cursor: pointer;
+    }
+    .white { background-color: #eee; }
+    .black { background-color: #666; color: #fff; }
+    button { margin: 5px; padding: 10px; font-size: 16px; }
+    #status { margin-top: 10px; }
+  </style>
+</head>
+<body>
+  <h1>Chess DApp</h1>
+  <button id="connectBtn">Connect Wallet</button>
+  <button id="createGameBtn">Create Game</button>
+  <input type="number" id="gameIdInput" placeholder="Game ID" style="width:100px">
+  <button id="joinGameBtn">Join Game</button>
+  <p>Click two squares to make a move</p>
+  <table id="chessBoard"></table>
+  <div id="status"></div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers/dist/ethers.min.js"></script>
+  <script>
+    const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
+
+    const abi = [ /* Full ABI as provided by user */ 
+    {
+		"anonymous": false,
+		"inputs": [{"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},{"indexed": true,"internalType": "address","name": "white","type": "address"}],
+		"name": "GameCreated","type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [{"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},{"indexed": true,"internalType": "address","name": "winner","type": "address"}],
+		"name": "GameFinished","type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [{"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},{"indexed": true,"internalType": "address","name": "player","type": "address"},{"indexed": false,"internalType": "string","name": "move","type": "string"},{"indexed": false,"internalType": "uint256","name": "moveIndex","type": "uint256"},{"indexed": false,"internalType": "uint8","name": "nextTurn","type": "uint8"}],
+		"name": "MoveSubmitted","type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [{"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},{"indexed": true,"internalType": "address","name": "black","type": "address"}],
+		"name": "PlayerJoined","type": "event"
+	},
+	{"inputs":[],"name":"createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],"name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
+    ];
+
+    let provider, signer, chessContract;
+    let selected = null;
+    let currentGameId = null;
+
+    document.getElementById("connectBtn").onclick = async () => {
+      if(window.ethereum){
+        provider = new ethers.providers.Web3Provider(window.ethereum);
+        await provider.send("eth_requestAccounts", []);
+        signer = provider.getSigner();
+        chessContract = new ethers.Contract(contractAddress, abi, signer);
+        document.getElementById("status").innerText = "Wallet connected!";
+      } else {
+        alert("Use MetaMask mobile browser!");
+      }
+    };
+
+    document.getElementById("createGameBtn").onclick = async () => {
+      if(!chessContract) return alert("Connect wallet first!");
+      const tx = await chessContract.createGame();
+      const receipt = await tx.wait();
+      const event = receipt.events.find(e => e.event === "GameCreated");
+      currentGameId = event.args.gameId.toNumber();
+      document.getElementById("status").innerText = "Game Created! ID: " + currentGameId;
+    };
+
+    document.getElementById("joinGameBtn").onclick = async () => {
+      if(!chessContract) return alert("Connect wallet first!");
+      const gameId = parseInt(document.getElementById("gameIdInput").value);
+      if(isNaN(gameId)) return alert("Enter a valid Game ID");
+      await chessContract.joinGame(gameId);
+      currentGameId = gameId;
+      document.getElementById("status").innerText = "Joined Game: " + gameId;
+    };
+  </script>
+</body>
+</html>
