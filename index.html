@@ -1,103 +1,397 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Monad Chess DApp</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"/>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6.7.1/dist/ethers.min.js"></script>
-  <style>
-    body { font-family: Arial, sans-serif; text-align: center; background: #f4f4f4; margin: 0; }
-    header { background: #111; color: white; padding: 10px; display: flex; justify-content: space-between; align-items: center; }
-    header img { height: 40px; }
-    h1 { margin: 20px 0; }
-    #board { width: 350px; margin: 20px auto; }
-    button { padding: 10px 20px; margin: 10px; font-size: 16px; border: none; border-radius: 6px; cursor: pointer; }
-    button:hover { background: #ddd; }
-    footer { background: #111; color: white; padding: 15px; margin-top: 30px; }
-    footer a { color: #00acee; margin: 0 10px; text-decoration: none; }
-  </style>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Monad Chess DApp — Final</title>
+
+<!-- chessboard.js CSS (piece layout) -->
+<link rel="stylesheet" href="https://unpkg.com/chessboardjs@1.0.0/www/css/chessboard-1.0.0.min.css"/>
+
+<style>
+  body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f6f7f9; color:#111; text-align:center; }
+  header { background:#121212; color:#fff; display:flex; align-items:center; justify-content:space-between; padding:10px 16px; }
+  header img { height:42px; }
+  .container { padding:18px; max-width:920px; margin:0 auto; }
+  h1 { margin:12px 0; }
+  #controls { margin:14px 0; }
+  button { padding:8px 14px; margin:6px; font-size:15px; cursor:pointer; border-radius:8px; border:1px solid #ccc; background:#fff; }
+  button.primary { background:#0b84ff; color:#fff; border-color:#0b84ff; }
+  #status { margin-top:10px; font-weight:600; color:#222; }
+  #board { width:360px; margin:18px auto; }
+  footer { background:#121212; color:#fff; padding:14px 10px; margin-top:28px; }
+  footer a { color:#4da6ff; font-weight:600; text-decoration:none; margin:0 8px; }
+  footer span { color:#ffd86b; margin-left:8px; font-weight:600; }
+  .small { font-size:13px; color:#555; }
+</style>
 </head>
 <body>
-
 <header>
-  <img src="fox_logo.png" alt="Fox Logo"/>
-  <h2>MONAD</h2>
-  <img src="monad_logo.png" alt="Monad Logo"/>
+  <img src="fox_logo.png" alt="Fox Logo">
+  <div style="text-align:center;">
+    <div style="font-weight:700">Monad Chess DApp</div>
+    <div class="small">Play on Monad Testnet — moves stored on-chain</div>
+  </div>
+  <img src="monad_logo.png" alt="Monad Logo">
 </header>
 
-<h1>Monad Chess DApp <br>(AI Opponent)</h1>
+<div class="container">
+  <h1>♟️ Play vs AI (Monad Testnet)</h1>
 
-<button id="connectBtn">Connect Wallet</button>
-<button id="createGameBtn">Create Game</button>
+  <div id="controls">
+    <button id="connectBtn" class="primary">Connect Wallet</button>
+    <button id="createBtn">Create Game (on-chain)</button>
+    <button id="joinBtn">Join Game (on-chain)</button>
+    <input id="gameIdInput" placeholder="Game ID (optional)" style="padding:6px 8px; margin-left:8px; width:110px"/>
+    <button id="toggleAiBtn">AI: ON</button>
+  </div>
 
-<div id="board"></div>
+  <div id="status">Status: <span id="statusText">Not connected</span></div>
+
+  <div id="board"></div>
+
+  <p class="small">Tip: open this page in an in-app wallet browser (OKX, MetaMask mobile) for best mobile connect support.</p>
+</div>
 
 <footer>
-  <p>Follow me:</p>
-  <a href="https://t.me/pawansatoshiji" target="_blank">Telegram</a> |
-  <a href="https://youtube.com/@PawanSatoshi" target="_blank">YouTube</a> |
-  <a href="https://x.com/pawansatoshix" target="_blank">Twitter</a> |
-  <span>Discord: @pawansatoshi</span>
+  <div>Follow me:
+    <a href="https://t.me/pawansatoshiji" target="_blank">Telegram</a> |
+    <a href="https://youtube.com/@PawanSatoshi" target="_blank">YouTube</a> |
+    <a href="https://x.com/pawansatoshix" target="_blank">X (Twitter)</a>
+    <span>Discord: @pawansatoshi</span>
+  </div>
 </footer>
 
+<!-- Libraries (reliable CDN order) -->
+<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.13.4/chess.min.js"></script>
+<script src="https://unpkg.com/chessboardjs@1.0.0/www/js/chessboard-1.0.0.min.js"></script>
+
 <script>
-  // Monad Testnet RPC
-  const MONAD_RPC = "https://testnet-rpc.monad.xyz"; 
-  let provider, signer;
+/*
+  Final single-file DApp
+  - Uses ethers v5 UMD (global `ethers`)
+  - chess.js + chessboard.js for UI & validation
+  - Tries to detect injected wallets broadly
+  - Attempts to switch/add Monad Testnet (chainId 10143 / 0x279F), but if wallet blocks it provides guidance
+  - createGame() and submitMove() use your provided ABI & deployed contract
+  - Local random AI replies (does NOT sign on-chain)
+*/
 
-  // Connect Wallet
-  document.getElementById("connectBtn").addEventListener("click", async () => {
-    try {
-      if (window.ethereum) {
-        provider = new ethers.BrowserProvider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        signer = await provider.getSigner();
-        const address = await signer.getAddress();
-        alert("Wallet Connected: " + address);
-      } else {
-        // fallback to Monad RPC (no metamask)
-        provider = new ethers.JsonRpcProvider(MONAD_RPC);
-        alert("Connected to Monad RPC (no wallet)");
-      }
-    } catch (err) {
-      console.error(err);
-      alert("Wallet connection error: " + err.message);
-    }
-  });
+/* ---------- CONFIG ---------- */
+// Your deployed smart contract (from you)
+const CONTRACT_ADDRESS = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
 
-  // Create Game (Dummy for now)
-  document.getElementById("createGameBtn").addEventListener("click", async () => {
-    if (!signer) {
-      alert("Connect wallet first!");
-      return;
-    }
-    alert("Game created on Monad Testnet!");
-    // TODO: integrate with deployed smart contract
-  });
+// ABI you supplied earlier (kept exactly)
+const CONTRACT_ABI = [
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"white","type":"address"}],"name":"GameCreated","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"GameFinished","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"string","name":"move","type":"string"},{"indexed":false,"internalType":"uint256","name":"moveIndex","type":"uint256"},{"indexed":false,"internalType":"uint8","name":"nextTurn","type":"uint8"}],"name":"MoveSubmitted","type":"event"},
+  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"black","type":"address"}],"name":"PlayerJoined","type":"event"},
+  {"inputs":[],"name":"createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],"name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+  {"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
+];
 
-  // Chessboard + AI opponent
-  const game = new Chess();
-  const board = Chessboard('board', {
+// Monad Testnet settings (official)
+const MONAD_CHAIN = {
+  chainId: "0x279F", // 10143 decimal
+  chainName: "Monad Testnet",
+  nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+  rpcUrls: ["https://testnet-rpc.monad.xyz"],
+  blockExplorerUrls: ["https://testnet.monadexplorer.com"]
+};
+
+// Fallback read-only provider (if no injected wallet)
+const FALLBACK_RPC = MONAD_CHAIN.rpcUrls[0];
+
+/* ---------- App state ---------- */
+let injectedProvider = null;     // raw injected provider object (window.ethereum / window.okxwallet / etc)
+let web3Provider = null;         // ethers.js Web3Provider (wrapped injectedProvider)
+let signer = null;
+let contract = null;
+let currentGameId = null;
+let aiEnabled = true;
+
+/* ---------- UI references ---------- */
+const statusText = document.getElementById('statusText');
+const connectBtn = document.getElementById('connectBtn');
+const createBtn = document.getElementById('createBtn');
+const joinBtn = document.getElementById('joinBtn');
+const gameIdInput = document.getElementById('gameIdInput');
+const toggleAiBtn = document.getElementById('toggleAiBtn');
+
+/* ---------- Chess UI (chess.js + chessboard.js) ---------- */
+let chess = null;
+let boardUI = null;
+
+function logStatus(txt) {
+  console.log('[DApp] ' + txt);
+  statusText.innerText = txt;
+}
+
+function initChessboard() {
+  // make sure chess.js is loaded
+  if (typeof Chess !== 'function' && typeof window.Chess !== 'function') {
+    logStatus('Error: chess.js not loaded');
+    return;
+  }
+  chess = new Chess();
+
+  // chessboard.js piece images via CDN (guaranteed path)
+  const pieceTheme = 'https://unpkg.com/chessboardjs@1.0.0/www/img/chesspieces/wikipedia/{piece}.png';
+
+  boardUI = Chessboard('board', {
     draggable: true,
     position: 'start',
-    onDrop: (source, target) => {
-      const move = game.move({ from: source, to: target, promotion: 'q' });
-      if (move === null) return 'snapback';
-      setTimeout(makeAIMove, 250);
-    }
+    pieceTheme: pieceTheme,
+    onDrop: onDropHandler
   });
 
-  function makeAIMove() {
-    const possibleMoves = game.moves();
-    if (game.game_over() || possibleMoves.length === 0) return;
-    const move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-    game.move(move);
-    board.position(game.fen());
-  }
-</script>
+  logStatus('Board ready — connect wallet to play on-chain');
+}
 
+/* Convert chessboard algebraic square (e.g. "e2") to row,col used in earlier contract examples:
+   row: 0..7 top-to-bottom (0 = rank 8), col: 0..7 left-to-right (a=0)
+   This mirrors the earlier format "prevRow,prevCol->row,col" that was used by your frontend.
+*/
+function squareToCoords(sq) {
+  const file = sq[0];
+  const rank = parseInt(sq[1], 10);
+  const col = file.charCodeAt(0) - 'a'.charCodeAt(0);
+  const row = 8 - rank; // rank 8 -> row0; rank1 -> row7
+  return [row, col];
+}
+
+/* ---------- Provider detection & connection ---------- */
+
+function findInjectedProvider() {
+  // Try common injection points
+  if (window.ethereum) return window.ethereum;
+  if (window.okxwallet) return window.okxwallet;
+  if (window.bitkeep) return window.bitkeep;
+  if (window.coinbaseWalletExtension) return window.coinbaseWalletExtension;
+  // Look for any global with request/send (best-effort)
+  for (const name of Object.keys(window)) {
+    try {
+      const obj = window[name];
+      if (obj && typeof obj.request === 'function' && (name.toLowerCase().includes('wallet') || name.toLowerCase().includes('ethereum'))) {
+        return obj;
+      }
+    } catch {}
+  }
+  return null;
+}
+
+async function ensureMonadNetworkOrInform(providerObj) {
+  // Try to switch to Monad Testnet; if wallet prevents it show instructions
+  try {
+    await providerObj.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: MONAD_CHAIN.chainId }] });
+    logStatus('Switched wallet to Monad Testnet');
+    return true;
+  } catch (err) {
+    // 4902 = chain not found in wallet -> try add
+    if (err && (err.code === 4902 || err.code === '4902')) {
+      try {
+        await providerObj.request({ method: 'wallet_addEthereumChain', params: [MONAD_CHAIN] });
+        logStatus('Added Monad Testnet to wallet and switched');
+        return true;
+      } catch (addErr) {
+        console.warn('Failed to add chain:', addErr);
+        alert('Please add Monad Testnet to your wallet manually. RPC: ' + MONAD_CHAIN.rpcUrls[0] + '\nChain ID: ' + MONAD_CHAIN.chainId);
+        return false;
+      }
+    } else {
+      console.warn('Switch chain error (wallet may have blocked):', err);
+      alert('Please switch your wallet network to Monad Testnet (chain id 10143) and reconnect.');
+      return false;
+    }
+  }
+}
+
+async function connectWalletFlow() {
+  try {
+    injectedProvider = findInjectedProvider();
+    if (!injectedProvider) {
+      // No injected provider — fall back to read-only provider and instruct user
+      web3Provider = new ethers.providers.JsonRpcProvider(FALLBACK_RPC);
+      logStatus('No injected wallet detected — connected read-only to Monad RPC');
+      signer = null;
+      contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, web3Provider);
+      return;
+    }
+
+    // Use ethers Web3Provider to wrap it
+    web3Provider = new ethers.providers.Web3Provider(injectedProvider, 'any');
+
+    // Request accounts to trigger wallet popup (if app-browser)
+    await injectedProvider.request({ method: 'eth_requestAccounts' });
+
+    // Attempt to ensure network is Monad Testnet (best-effort)
+    await ensureMonadNetworkOrInform(injectedProvider).catch(e => {
+      console.warn('ensureMonadNetworkOrInform failed:', e);
+    });
+
+    // Re-wrap provider (network might have changed)
+    web3Provider = new ethers.providers.Web3Provider(injectedProvider, 'any');
+    signer = web3Provider.getSigner();
+    contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+
+    const addr = await signer.getAddress();
+    logStatus('Wallet connected: ' + addr);
+  } catch (err) {
+    console.error('connectWalletFlow error', err);
+    alert('Wallet connection failed: ' + (err && err.message ? err.message : err));
+    logStatus('Wallet connection error');
+  }
+}
+
+/* ---------- Contract interactions ---------- */
+
+async function createGameOnChain() {
+  if (!contract || !signer) { alert('Connect wallet first (must be on Monad Testnet)'); return; }
+  try {
+    logStatus('Sending createGame transaction...');
+    const tx = await contract.createGame();
+    const receipt = await tx.wait();
+    // try to find GameCreated event
+    let parsed = null;
+    if (receipt && receipt.logs) {
+      const iface = new ethers.utils.Interface(CONTRACT_ABI);
+      for (const log of receipt.logs) {
+        try {
+          const e = iface.parseLog(log);
+          if (e && e.name === 'GameCreated') { parsed = e; break; }
+        } catch (e) {}
+      }
+    }
+    if (parsed) {
+      currentGameId = parsed.args.gameId.toString();
+      logStatus('GameCreated on-chain. ID: ' + currentGameId);
+      gameIdInput.value = currentGameId;
+    } else if (receipt && receipt.events) {
+      const ev = receipt.events.find(x => x.event === 'GameCreated');
+      if (ev) {
+        currentGameId = ev.args.gameId.toString();
+        logStatus('GameCreated on-chain. ID: ' + currentGameId);
+        gameIdInput.value = currentGameId;
+      } else {
+        logStatus('Game created but event not found; check explorer');
+      }
+    } else {
+      logStatus('Transaction mined but event not parsed');
+    }
+  } catch (err) {
+    console.error('createGameOnChain err', err);
+    alert('createGame failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+async function joinGameOnChain() {
+  const id = gameIdInput.value.trim();
+  if (!id) return alert('Enter a gameId to join in the input box');
+  if (!contract || !signer) { alert('Connect wallet first (must be on Monad Testnet)'); return; }
+  try {
+    logStatus('Joining game ' + id + ' on-chain...');
+    const tx = await contract.joinGame(id);
+    await tx.wait();
+    currentGameId = id;
+    logStatus('Joined game ' + id);
+  } catch (err) {
+    console.error('joinGameOnChain err', err);
+    alert('joinGame failed: ' + (err && err.message ? err.message : err));
+  }
+}
+
+/* ---------- Chessboard onDrop handler & on-chain submit ---------- */
+
+async function onDropHandler(source, target) {
+  // Validate move using chess.js
+  const move = chess.move({ from: source, to: target, promotion: 'q' });
+  if (move === null) {
+    return 'snapback';
+  }
+
+  // Update UI immediately
+  boardUI.position(chess.fen());
+
+  // Prepare move string in same format used earlier: "r1,c1->r2,c2"
+  // Convert algebraic to row/col pairs
+  const [sr, sc] = squareToCoords(source);
+  const [tr, tc] = squareToCoords(target);
+  const moveString = `${sr},${sc}->${tr},${tc}`;
+
+  // If on-chain game exists, submit to contract
+  if (contract && currentGameId) {
+    try {
+      logStatus('Submitting move to chain: ' + moveString);
+      const tx = await contract.submitMove(currentGameId, moveString);
+      await tx.wait();
+      logStatus('Move submitted on-chain: ' + moveString);
+    } catch (err) {
+      console.error('submitMove failed', err);
+      alert('On-chain move failed: ' + (err && err.message ? err.message : err));
+      // revert local move on failure
+      chess.undo();
+      boardUI.position(chess.fen());
+      return 'snapback';
+    }
+  } else {
+    logStatus('No on-chain game id — move kept locally: ' + moveString);
+  }
+
+  // After player move, if AI is enabled, ask AI to play (local & not on-chain)
+  if (aiEnabled) setTimeout(doLocalAiMove, 400);
+}
+
+/* Local random AI (plays legal moves). AI moves are local only (not on-chain).
+   If in future you want AI to submit moves on-chain, that must be done server-side with a secure wallet.
+*/
+function doLocalAiMove() {
+  if (chess.game_over()) {
+    logStatus('Game over — no AI move');
+    return;
+  }
+  const moves = chess.moves();
+  if (!moves || moves.length === 0) return;
+  // choose random legal move
+  const mv = moves[Math.floor(Math.random() * moves.length)];
+  chess.move(mv);
+  boardUI.position(chess.fen());
+  logStatus('AI played: ' + mv);
+}
+
+/* ---------- Utilities & event wiring ---------- */
+
+window.addEventListener('DOMContentLoaded', () => {
+  // Init chessboard
+  initChessboard();
+
+  // Wire buttons
+  connectBtn.onclick = async () => {
+    logStatus('Attempting wallet connection...');
+    await connectWalletFlow();
+  };
+  createBtn.onclick = async () => {
+    await createGameOnChain();
+  };
+  joinBtn.onclick = async () => {
+    await joinGameOnChain();
+  };
+  toggleAiBtn.onclick = () => {
+    aiEnabled = !aiEnabled;
+    toggleAiBtn.innerText = aiEnabled ? 'AI: ON' : 'AI: OFF';
+    logStatus('AI turned ' + (aiEnabled ? 'ON' : 'OFF'));
+  };
+
+  logStatus('Ready — board loaded. Connect wallet to store moves on-chain.');
+});
+
+</script>
 </body>
-</html>
+  </html>
