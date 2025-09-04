@@ -4,143 +4,126 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monad Chess Testnet</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/css/chessboard.min.css"/>
 <style>
-body { font-family: Arial, sans-serif; text-align: center; margin: 20px; }
-#board { width: 90%; max-width: 480px; margin: 20px auto; }
-button { margin: 5px; padding: 10px 20px; font-size: 16px; }
-.highlight { background-color: #90ee90 !important; }
-#history, #leaderboard { margin-top: 20px; font-size: 14px; max-width: 480px; margin-left: auto; margin-right: auto; text-align: left; }
-footer { margin-top: 30px; font-size: 14px; }
-footer a { margin: 0 10px; color: #333; text-decoration: none; }
-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-th, td { border: 1px solid #ccc; padding: 5px; text-align: center; }
-th { background-color: #f0f0f0; }
+  body { font-family: Arial, sans-serif; background: #111; color: #eee; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+  #board { display: grid; grid-template-columns: repeat(8, 50px); grid-template-rows: repeat(8, 50px); gap: 0; margin-bottom: 20px; }
+  .square { width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; font-size: 30px; cursor: pointer; }
+  .white { background-color: #f0d9b5; }
+  .black { background-color: #b58863; }
+  button { margin: 5px; padding: 10px 15px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; background: #4CAF50; color: #fff; }
+  button:disabled { background: #555; cursor: not-allowed; }
+  #moves, #leaderboard { margin-top: 15px; max-width: 400px; width: 100%; word-break: break-word; }
 </style>
 </head>
 <body>
 
-<h1>Monad Chess Testnet</h1>
+<h1>Monad Chess Testnet ♟️</h1>
+
 <div id="board"></div>
 
 <div>
   <button id="connectWallet">Connect Wallet</button>
-  <button id="createGame" disabled>Create Game (White)</button>
-  <button id="joinGame" disabled>Join Game (Black / AI)</button>
+  <button id="createGame" disabled>Create Game</button>
+  <button id="joinGame" disabled>Join Game (AI)</button>
   <button id="undoMove" disabled>Undo Last Move</button>
 </div>
 
-<div id="history"><strong>Move History:</strong><br/></div>
-<div id="leaderboard"><strong>Leaderboard:</strong></div>
+<div id="moves">Moves:</div>
+<div id="leaderboard">Leaderboard:</div>
 
-<footer>
-  <a href="https://t.me/pawansatoshiji" target="_blank">Telegram</a>
-  <a href="https://youtube.com/@PawanSatoshi" target="_blank">YouTube</a>
-  <a href="https://x.com/pawansatoshix" target="_blank">X</a>
-</footer>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/1.0.0/chess.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/js/chessboard.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.min.js"></script>
-
+<script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js"></script>
 <script>
-let board=null;
-let game=new Chess();
-let walletAddress=null;
-let playerRole=null;
-let currentGameId=null;
-let moveHistoryDiv=document.getElementById('history');
-let leaderboardDiv=document.getElementById('leaderboard');
-
-const connectWalletBtn=document.getElementById('connectWallet');
-const createGameBtn=document.getElementById('createGame');
-const joinGameBtn=document.getElementById('joinGame');
-const undoMoveBtn=document.getElementById('undoMove');
-
-let leaderboard=JSON.parse(localStorage.getItem('leaderboard'))||{};
-
-// ===== Smart Contract =====
-const contractAddress="0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
-const contractABI=[
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"white","type":"address"}],"name":"GameCreated","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"GameFinished","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"string","name":"move","type":"string"},{"indexed":false,"internalType":"uint256","name":"moveIndex","type":"uint256"},{"indexed":false,"internalType":"uint8","name":"nextTurn","type":"uint8"}],"name":"MoveSubmitted","type":"event"},
-  {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"black","type":"address"}],"name":"PlayerJoined","type":"event"},
-  {"inputs":[],"name":"createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],"name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
-  {"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-  {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
+const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
+const contractABI = /* ABI you provided */ [
+	{
+		"anonymous": false,
+		"inputs": [
+			{"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},
+			{"indexed": true,"internalType": "address","name": "white","type": "address"}
+		],
+		"name": "GameCreated","type": "event"
+	},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"GameFinished","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"string","name":"move","type":"string"},{"indexed":false,"internalType":"uint256","name":"moveIndex","type":"uint256"},{"indexed":false,"internalType":"uint8","name":"nextTurn","type":"uint8"}],"name":"MoveSubmitted","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"black","type":"address"}],"name":"PlayerJoined","type":"event"},
+	{"inputs":[],"name":"createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],"name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
 ];
 
-let chessContract=null;
+let provider, signer, contract, currentGameId;
+let board = [];
 
-// ===== Board Initialization =====
-function initBoard(){
-  board=Chessboard(document.getElementById('board'),{
-    position:'start',
-    draggable:true,
-    onDragStart:(source,piece)=>{
-      if(game.game_over()) return false;
-      if((game.turn()==='w' && piece.search(/^b/)!==-1)||(game.turn()==='b' && piece.search(/^w/)!==-1)) return false;
-    },
-    onDrop: async (source,target)=>{
-      const move=game.move({from:source,to:target,promotion:'q'});
-      if(!move) return 'snapback';
-      updateBoard(); updateHistory(); checkGameStatus();
-      undoMoveBtn.disabled=false;
-
-      if(currentGameId && playerRole) await submitMoveOnChain(move.san);
-
-      if(!game.game_over() && ((playerRole==='white' && game.turn()==='b')||(playerRole==='black' && game.turn()==='w')))
-        setTimeout(aiMove,600);
-    }
-  });
+function initBoard() {
+	board = [];
+	const boardDiv = document.getElementById('board');
+	boardDiv.innerHTML = '';
+	const rows = 8, cols = 8;
+	const initialPieces = [
+		["♜","♞","♝","♛","♚","♝","♞","♜"],
+		["♟","♟","♟","♟","♟","♟","♟","♟"],
+		["","","","","","","",""],
+		["","","","","","","",""],
+		["","","","","","","",""],
+		["","","","","","","",""],
+		["♙","♙","♙","♙","♙","♙","♙","♙"],
+		["♖","♘","♗","♕","♔","♗","♘","♖"]
+	];
+	for(let r=0;r<rows;r++){
+		let rowArr = [];
+		for(let c=0;c<cols;c++){
+			const square = document.createElement('div');
+			square.className = ((r+c)%2===0)?"square white":"square black";
+			square.textContent = initialPieces[r][c];
+			boardDiv.appendChild(square);
+			rowArr.push(square);
+		}
+		board.push(rowArr);
+	}
 }
 
-function updateBoard(){ board.position(game.fen()); }
-function updateHistory(){ moveHistoryDiv.innerHTML="<strong>Move History:</strong><br/>"+game.history().join(', '); }
-
-function checkGameStatus(){
-  if(game.in_checkmate()){ alert('Checkmate! Game over.'); recordResult(playerRole==='white'?'win':'loss'); }
-  else if(game.in_draw()){ alert('Draw!'); recordResult('draw'); }
-  else if(game.in_check()) alert('Check!');
+async function connectWallet() {
+	if(!window.ethereum) return alert("Install MetaMask!");
+	provider = new ethers.BrowserProvider(window.ethereum);
+	await provider.send("eth_requestAccounts", []);
+	signer = await provider.getSigner();
+	contract = new ethers.Contract(contractAddress, contractABI, signer);
+	document.getElementById('createGame').disabled = false;
+	document.getElementById('joinGame').disabled = false;
+	initBoard();
 }
 
-function recordResult(result){
-  if(!walletAddress) return;
-  if(!leaderboard[walletAddress]) leaderboard[walletAddress]={wins:0,losses:0,draws:0};
-  if(result==='win') leaderboard[walletAddress].wins++;
-  else if(result==='loss') leaderboard[walletAddress].losses++;
-  else leaderboard[walletAddress].draws++;
-  localStorage.setItem('leaderboard',JSON.stringify(leaderboard));
-  renderLeaderboard();
+async function createGame() {
+	const tx = await contract.createGame();
+	const receipt = await tx.wait();
+	const gameId = await contract.nextGameId() - 1; 
+	currentGameId = gameId;
+	alert(`Game created with ID: ${gameId}`);
+	document.getElementById('undoMove').disabled = false;
 }
 
-function renderLeaderboard(){
-  let html="<strong>Leaderboard:</strong><table><tr><th>Wallet</th><th>Wins</th><th>Losses</th><th>Draws</th></tr>";
-  const sorted=Object.entries(leaderboard).sort((a,b)=>b[1].wins-a[1].wins);
-  for(let [wallet,stats] of sorted) html+=`<tr><td>${wallet}</td><td>${stats.wins}</td><td>${stats.losses}</td><td>${stats.draws}</td></tr>`;
-  html+="</table>";
-  leaderboardDiv.innerHTML=html;
+async function joinGame() {
+	if(!currentGameId) currentGameId = (await contract.nextGameId()) - 1;
+	await contract.joinGame(currentGameId);
+	alert("Joined Game as Black ✅");
+	document.getElementById('undoMove').disabled = false;
 }
 
-undoMoveBtn.addEventListener('click',()=>{
-  if(game.history().length===0) return;
-  game.undo(); game.undo();
-  updateBoard(); updateHistory();
-  undoMoveBtn.disabled=game.history().length===0;
-});
+async function undoMove() {
+	alert("Undo feature requires smart contract support.");
+}
 
-// Connect Wallet
-async function connectWallet(){
-  if(!window.ethereum) return alert('Please install MetaMask');
-  const provider=new ethers.BrowserProvider(window.ethereum);
-  await provider.send("eth_requestAccounts",[]);
-  const signer=await provider.getSigner();
-  walletAddress=await signer.getAddress();
-  chessContract=new ethers.Contract(contractAddress,contractABI,signer);
-  alert('Wallet
+document.getElementById('connectWallet').onclick = connectWallet;
+document.getElementById('createGame').onclick = createGame;
+document.getElementById('joinGame').onclick = joinGame;
+document.getElementById('undoMove').onclick = undoMove;
+
+initBoard();
+</script>
+</body>
+</html>
