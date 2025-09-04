@@ -41,17 +41,19 @@
   <span>Discord: @pawansatoshi</span>
 </footer>
 
-<!-- Ethers.js v5 (stable UMD build) -->
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-<script>
+<script type="module">
+  import { ethers } from "https://cdn.ethers.io/lib/ethers-6.6.0.esm.min.js";
+
+  // === Monad Testnet Info ===
   const MONAD_PARAMS = {
-    chainId: "0x27F3", // 10143 in hex
+    chainId: "0x1F47", // Example: 8007 in hex → update with actual testnet ID
     chainName: "Monad Testnet",
-    rpcUrls: ["https://testnet-rpc.monad.xyz"],
     nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
-    blockExplorerUrls: ["https://testnet.monadexplorer.com"]
+    rpcUrls: ["https://testnet-rpc.monad.xyz"], // update with official RPC
+    blockExplorerUrls: ["https://testnet-explorer.monad.xyz"]
   };
 
+  // === Your Contract ===
   const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
   const contractABI = [
     {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"white","type":"address"}],"name":"GameCreated","type":"event"},
@@ -70,22 +72,38 @@
 
   let provider, signer, contract, currentGameId;
 
+  // === Universal Wallet Connect ===
   async function connectWallet() {
-    console.log("Connect button clicked...");
-    if (!window.ethereum) { alert("Please install MetaMask!"); return; }
-
     try {
-      await window.ethereum.request({ method: "wallet_addEthereumChain", params: [MONAD_PARAMS] });
-      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      let injectedProvider = window.ethereum || window.okxwallet || window.bitkeep || window.coinbaseWalletExtension;
+
+      if (!injectedProvider) {
+        alert("No compatible wallet found. Open in MetaMask, OKX, Coinbase, or another EVM wallet.");
+        return;
+      }
+
+      provider = new ethers.BrowserProvider(injectedProvider);
+
+      // Ensure network is Monad
+      try {
+        await injectedProvider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: MONAD_PARAMS.chainId }] });
+      } catch (switchError) {
+        if (switchError.code === 4902) {
+          await injectedProvider.request({ method: "wallet_addEthereumChain", params: [MONAD_PARAMS] });
+        } else {
+          throw switchError;
+        }
+      }
+
       await provider.send("eth_requestAccounts", []);
-      signer = provider.getSigner();
+      signer = await provider.getSigner();
       contract = new ethers.Contract(contractAddress, contractABI, signer);
-      const address = await signer.getAddress();
-      document.getElementById("status").innerText = `Wallet connected: ${address}`;
-      console.log("Wallet connected:", address);
+
+      const userAddr = await signer.getAddress();
+      document.getElementById("status").innerText = "Wallet connected: " + userAddr;
     } catch (err) {
-      console.error("Wallet connection failed:", err);
-      alert("Connection error: " + err.message);
+      console.error(err);
+      alert("Wallet connection error: " + err.message);
     }
   }
 
@@ -94,8 +112,8 @@
     try {
       const tx = await contract.createGame();
       const receipt = await tx.wait();
-      const event = receipt.events.find(e => e.event === "GameCreated");
-      currentGameId = event.args.gameId.toNumber();
+      const event = receipt.logs.map(log => contract.interface.parseLog(log)).find(e => e.name === "GameCreated");
+      currentGameId = event.args.gameId.toString();
       document.getElementById("status").innerText = `Game created! ID: ${currentGameId}`;
     } catch (err) {
       console.error(err);
@@ -103,7 +121,10 @@
     }
   }
 
-  // ===== Chess Board =====
+  document.getElementById("connectBtn").addEventListener("click", connectWallet);
+  document.getElementById("createBtn").addEventListener("click", createGame);
+
+  // === Chess Board ===
   const boardElement = document.getElementById("board");
   const rows = 8, cols = 8;
   let selectedCell = null;
@@ -162,16 +183,11 @@
         alert("Error submitting move: " + err.message);
       }
     } else {
-      if(board[row][col]) selectedCell = [row,col];
+      selectedCell = [row,col];
     }
   }
 
-  window.addEventListener("DOMContentLoaded", () => {
-    document.getElementById("connectBtn").addEventListener("click", connectWallet);
-    document.getElementById("createBtn").addEventListener("click", createGame);
-    renderBoard();
-  });
+  renderBoard();
 </script>
-
 </body>
 </html>
