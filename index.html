@@ -43,7 +43,7 @@
 </footer>
 
 <script>
-  // ====== Ethereum / Contract Setup ======
+  // ====== Contract Setup ======
   const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
   const contractABI = [
     {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"white","type":"address"}],"name":"GameCreated","type":"event"},
@@ -64,15 +64,12 @@
 
   async function connectWallet() {
     try {
-      if (window.ethereum) {
-        provider = new ethers.providers.Web3Provider(window.ethereum);
-        await provider.send("eth_requestAccounts", []);
-        signer = provider.getSigner();
-        contract = new ethers.Contract(contractAddress, contractABI, signer);
-        document.getElementById("status").innerText = "Wallet connected!";
-      } else {
-        alert("Please install MetaMask or another Ethereum wallet!");
-      }
+      if (!window.ethereum) { alert("Please install MetaMask!"); return; }
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      contract = new ethers.Contract(contractAddress, contractABI, signer);
+      document.getElementById("status").innerText = "Wallet connected!";
     } catch (err) {
       console.error(err);
       alert("Error connecting wallet: " + err.message);
@@ -84,7 +81,6 @@
     try {
       const tx = await contract.createGame();
       const receipt = await tx.wait();
-      // Extract gameId from GameCreated event
       const event = receipt.events.find(e => e.event === "GameCreated");
       currentGameId = event.args.gameId.toNumber();
       document.getElementById("status").innerText = `Game created! ID: ${currentGameId}`;
@@ -136,37 +132,7 @@
     const row = parseInt(event.target.dataset.row);
     const col = parseInt(event.target.dataset.col);
 
-    if (!currentGameId) {
-      alert("Create a game first!");
-      return;
-    }
+    if (!currentGameId) { alert("Create a game first!"); return; }
 
     if (selectedCell) {
-      const [prevRow, prevCol] = selectedCell;
-      const moveString = `${prevRow},${prevCol}->${row},${col}`;
-      // Update board locally
-      board[row][col] = board[prevRow][prevCol];
-      board[prevRow][prevCol] = '';
-      renderBoard();
-      selectedCell = null;
-
-      // Submit move to smart contract
-      try {
-        const tx = await contract.submitMove(currentGameId, moveString);
-        await tx.wait();
-        document.getElementById("status").innerText = `Move submitted: ${moveString}`;
-      } catch (err) {
-        console.error(err);
-        alert("Error submitting move: " + err.message);
-      }
-
-    } else if (board[row][col] !== '') {
-      selectedCell = [row, col];
-    }
-  }
-
-  renderBoard();
-</script>
-
-</body>
-	</html>
+      const [prevRow, prevCol] = selectedCell
