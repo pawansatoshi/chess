@@ -4,7 +4,6 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monad Chess DApp</title>
-  <script src="https://cdn.ethers.io/lib/ethers-6.6.0.min.js" type="application/javascript"></script>
   <style>
     body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; text-align:center; }
     header, footer { background:#1f1f1f; color:white; padding:10px 0; }
@@ -42,16 +41,32 @@
   <span>Discord: @pawansatoshi</span>
 </footer>
 
-<script>
-  // ===== Contract Setup =====
+<!-- Fixed ethers import -->
+<script type="module">
+  import { ethers } from "https://cdn.ethers.io/lib/ethers-6.6.0.esm.min.js";
+
   const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
-  const contractABI = [ /* Paste your full ABI here */ ];
+
+  const contractABI = [
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"white","type":"address"}],"name":"GameCreated","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"GameFinished","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"string","name":"move","type":"string"},{"indexed":false,"internalType":"uint256","name":"moveIndex","type":"uint256"},{"indexed":false,"internalType":"uint8","name":"nextTurn","type":"uint8"}],"name":"MoveSubmitted","type":"event"},
+	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"black","type":"address"}],"name":"PlayerJoined","type":"event"},
+	{"inputs":[],"name":"createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],"name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
+	{"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
+	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
+  ];
 
   let provider, signer, contract, currentGameId;
 
   async function connectWallet() {
     try {
-      if (!window.ethereum) { alert("Install MetaMask!"); return; }
+      if (!window.ethereum) { alert("Please install MetaMask!"); return; }
       provider = new ethers.providers.Web3Provider(window.ethereum);
       await provider.send("eth_requestAccounts", []);
       signer = provider.getSigner();
@@ -86,8 +101,8 @@
   let selectedCell = null;
 
   const pieces = {
-    'r': '♜', 'n': '♞', 'b': '♝', 'q': '♛', 'k': '♚', 'p': '♟',
-    'R': '♖', 'N': '♘', 'B': '♗', 'Q': '♕', 'K': '♔', 'P': '♙'
+    'r': '♜','n': '♞','b': '♝','q': '♛','k': '♚','p': '♟',
+    'R': '♖','N': '♘','B': '♗','Q': '♕','K': '♔','P': '♙'
   };
 
   let board = [
@@ -125,27 +140,15 @@
     if(selectedCell){
       const [prevRow,prevCol] = selectedCell;
       const moveString = `${prevRow},${prevCol}->${row},${col}`;
-      board[row][col]=board[prevRow][prevCol];
-      board[prevRow][prevCol]='';
+      board[row][col] = board[prevRow][prevCol];
+      board[prevRow][prevCol] = '';
       renderBoard();
-      selectedCell=null;
+      selectedCell = null;
 
       try{
         const tx = await contract.submitMove(currentGameId, moveString);
         await tx.wait();
-        document.getElementById("status").innerText=`Move submitted: ${moveString}`;
+        document.getElementById("status").innerText = `Move submitted: ${moveString}`;
       }catch(err){
         console.error(err);
-        alert("Move submission error: "+err.message);
-      }
-
-    } else if(board[row][col]!==''){
-      selectedCell=[row,col];
-    }
-  }
-
-  renderBoard();
-</script>
-
-</body>
-</html>
+        alert
