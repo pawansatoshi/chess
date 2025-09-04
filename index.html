@@ -2,192 +2,97 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Monad Chess DApp</title>
+  <!-- Libraries -->
+  <script src="https://cdn.ethers.io/lib/ethers-5.7.2.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.12.0/chess.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.js"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/chessboard-js/1.0.0/chessboard-1.0.0.min.css"/>
   <style>
-    body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; text-align:center; }
-    header, footer { background:#1f1f1f; color:white; padding:10px 0; }
-    header img, footer img { height:40px; margin:0 10px; vertical-align:middle; }
-    .container { padding:20px; }
-    button { padding:10px 20px; font-size:16px; margin:10px; cursor:pointer; }
-    #board { display:grid; grid-template-columns:repeat(8,50px); grid-template-rows:repeat(8,50px); margin:20px auto; }
-    .cell { width:50px; height:50px; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; }
-    .white { background:#eee; }
-    .black { background:#888; color:white; }
-    a { color:#4da6ff; text-decoration:none; margin:0 10px; }
-    #status { margin-top:10px; font-weight:bold; }
+    body { font-family: Arial,sans-serif; margin:0; padding:0; background:#111; color:#eee; text-align:center; }
+    header { display:flex; justify-content:space-between; align-items:center; padding:10px 20px; background:#1a1a1a; }
+    header img { height:50px; }
+    h1 { margin:10px 0; }
+    #board { width:400px; margin:20px auto; }
+    button { padding:10px 20px; margin:10px; border:none; background:#4caf50; color:white; border-radius:8px; cursor:pointer; font-size:16px; }
+    button:hover { background:#45a049; }
+    #status { margin-top:15px; font-size:14px; }
   </style>
 </head>
 <body>
+  <header>
+    <img src="fox_logo.png" alt="Fox Logo">
+    <h2>Monad Chess DApp</h2>
+    <img src="monad_logo.png" alt="Monad Logo">
+  </header>
 
-<header>
-  <img src="fox_logo.png" alt="Fox Logo">
-  <img src="monad_logo.png" alt="Monad Logo">
-</header>
-
-<div class="container">
-  <h1>Monad Chess DApp</h1>
-  <button id="connectBtn">Connect Wallet</button>
-  <button id="createBtn">Create Game</button>
-  <div id="status">Wallet not connected</div>
+  <h1>♟ Play Chess on Monad</h1>
   <div id="board"></div>
-</div>
 
-<footer>
-  <p>Follow me:</p>
-  <a href="https://t.me/pawansatoshiji" target="_blank">Telegram</a>
-  <a href="https://youtube.com/@PawanSatoshi" target="_blank">YouTube</a>
-  <a href="https://x.com/pawansatoshix" target="_blank">X (Twitter)</a>
-  <span>Discord: @pawansatoshi</span>
-</footer>
+  <button id="connectBtn">Connect Wallet</button>
+  <p id="status">Not Connected</p>
 
-<script type="module">
-  import { ethers } from "https://cdn.ethers.io/lib/ethers-6.6.0.esm.min.js";
+  <script>
+    const CONTRACT_ADDRESS = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
+    const ABI = [
+      { "inputs":[{"internalType":"string","name":"move","type":"string"}],"name":"makeMove","outputs":[],"stateMutability":"nonpayable","type":"function" }
+    ];
 
-  // === Monad Testnet Info ===
-  const MONAD_PARAMS = {
-    chainId: "0x1F47", // Example: 8007 in hex → update with actual testnet ID
-    chainName: "Monad Testnet",
-    nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
-    rpcUrls: ["https://testnet-rpc.monad.xyz"], // update with official RPC
-    blockExplorerUrls: ["https://testnet-explorer.monad.xyz"]
-  };
+    const MONAD_CHAIN = {
+      chainId: "0x279F", // 10143
+      chainName: "Monad Testnet",
+      nativeCurrency: { name: "Monad", symbol: "MON", decimals: 18 },
+      rpcUrls: ["https://testnet-rpc.monad.xyz"],
+      blockExplorerUrls: ["https://testnet.monadexplorer.com"]
+    };
 
-  // === Your Contract ===
-  const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
-  const contractABI = [
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"white","type":"address"}],"name":"GameCreated","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"GameFinished","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"string","name":"move","type":"string"},{"indexed":false,"internalType":"uint256","name":"moveIndex","type":"uint256"},{"indexed":false,"internalType":"uint8","name":"nextTurn","type":"uint8"}],"name":"MoveSubmitted","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"black","type":"address"}],"name":"PlayerJoined","type":"event"},
-    {"inputs":[],"name":"createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],"name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
-  ];
+    let signer, contract;
+    const chess = new Chess();
+    const board = Chessboard('board', { draggable: true, position: 'start', onDrop: handleMove });
 
-  let provider, signer, contract, currentGameId;
-
-  // === Universal Wallet Connect ===
-  async function connectWallet() {
-    try {
-      let injectedProvider = window.ethereum || window.okxwallet || window.bitkeep || window.coinbaseWalletExtension;
-
-      if (!injectedProvider) {
-        alert("No compatible wallet found. Open in MetaMask, OKX, Coinbase, or another EVM wallet.");
-        return;
-      }
-
-      provider = new ethers.BrowserProvider(injectedProvider);
-
-      // Ensure network is Monad
+    document.getElementById("connectBtn").onclick = async () => {
       try {
-        await injectedProvider.request({ method: "wallet_switchEthereumChain", params: [{ chainId: MONAD_PARAMS.chainId }] });
-      } catch (switchError) {
-        if (switchError.code === 4902) {
-          await injectedProvider.request({ method: "wallet_addEthereumChain", params: [MONAD_PARAMS] });
-        } else {
-          throw switchError;
+        let injected = window.ethereum || window.okxwallet || window.bitkeep || window.coinbaseWalletExtension;
+        if (!injected) return alert("Open in MetaMask, OKX, Trust, etc.");
+
+        await injected.request({ method: "eth_requestAccounts" });
+
+        try {
+          await injected.request({ method: "wallet_switchEthereumChain", params: [{ chainId: MONAD_CHAIN.chainId }] });
+        } catch (err) {
+          if (err.code === 4902) {
+            await injected.request({ method: "wallet_addEthereumChain", params: [MONAD_CHAIN] });
+          } else throw err;
+        }
+
+        const ep = new ethers.providers.Web3Provider(injected);
+        signer = ep.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+
+        const addr = await signer.getAddress();
+        document.getElementById("status").innerText = "Connected: " + addr;
+      } catch (err) {
+        console.error(err);
+        document.getElementById("status").innerText = "Connection Failed";
+      }
+    };
+
+    async function handleMove(src, dst) {
+      const mv = chess.move({ from: src, to: dst, promotion: 'q' });
+      if (!mv) return 'snapback';
+      board.position(chess.fen());
+
+      if (contract) {
+        try {
+          document.getElementById("status").innerText = "Sending move...";
+          await (await contract.makeMove(mv.san)).wait();
+          document.getElementById("status").innerText = "Move confirmed on Monad";
+        } catch (err) {
+          console.error(err);
+          document.getElementById("status").innerText = "Tx failed";
         }
       }
-
-      await provider.send("eth_requestAccounts", []);
-      signer = await provider.getSigner();
-      contract = new ethers.Contract(contractAddress, contractABI, signer);
-
-      const userAddr = await signer.getAddress();
-      document.getElementById("status").innerText = "Wallet connected: " + userAddr;
-    } catch (err) {
-      console.error(err);
-      alert("Wallet connection error: " + err.message);
     }
-  }
-
-  async function createGame() {
-    if (!contract) { alert("Connect wallet first!"); return; }
-    try {
-      const tx = await contract.createGame();
-      const receipt = await tx.wait();
-      const event = receipt.logs.map(log => contract.interface.parseLog(log)).find(e => e.name === "GameCreated");
-      currentGameId = event.args.gameId.toString();
-      document.getElementById("status").innerText = `Game created! ID: ${currentGameId}`;
-    } catch (err) {
-      console.error(err);
-      alert("Error creating game: " + err.message);
-    }
-  }
-
-  document.getElementById("connectBtn").addEventListener("click", connectWallet);
-  document.getElementById("createBtn").addEventListener("click", createGame);
-
-  // === Chess Board ===
-  const boardElement = document.getElementById("board");
-  const rows = 8, cols = 8;
-  let selectedCell = null;
-
-  const pieces = {
-    'r': '♜','n': '♞','b': '♝','q': '♛','k': '♚','p': '♟',
-    'R': '♖','N': '♘','B': '♗','Q': '♕','K': '♔','P': '♙'
-  };
-
-  let board = [
-    ['r','n','b','q','k','b','n','r'],
-    ['p','p','p','p','p','p','p','p'],
-    ['','','','','','','',''],
-    ['','','','','','','',''],
-    ['','','','','','','',''],
-    ['','','','','','','',''],
-    ['P','P','P','P','P','P','P','P'],
-    ['R','N','B','Q','K','B','N','R']
-  ];
-
-  function renderBoard() {
-    boardElement.innerHTML = '';
-    for (let i=0;i<rows;i++){
-      for (let j=0;j<cols;j++){
-        const cell = document.createElement("div");
-        cell.className = 'cell ' + ((i+j)%2===0?'white':'black');
-        cell.dataset.row=i;
-        cell.dataset.col=j;
-        cell.innerText = pieces[board[i][j]] || '';
-        cell.addEventListener("click", handleCellClick);
-        boardElement.appendChild(cell);
-      }
-    }
-  }
-
-  async function handleCellClick(event){
-    const row = parseInt(event.target.dataset.row);
-    const col = parseInt(event.target.dataset.col);
-
-    if(!currentGameId){ alert("Create a game first!"); return; }
-
-    if(selectedCell){
-      const [prevRow,prevCol] = selectedCell;
-      const moveString = `${prevRow},${prevCol}->${row},${col}`;
-      board[row][col] = board[prevRow][prevCol];
-      board[prevRow][prevCol] = '';
-      renderBoard();
-      selectedCell = null;
-
-      try{
-        const tx = await contract.submitMove(currentGameId, moveString);
-        await tx.wait();
-        document.getElementById("status").innerText = `Move submitted: ${moveString}`;
-      }catch(err){
-        console.error(err);
-        alert("Error submitting move: " + err.message);
-      }
-    } else {
-      selectedCell = [row,col];
-    }
-  }
-
-  renderBoard();
-</script>
+  </script>
 </body>
 </html>
