@@ -2,157 +2,141 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Monad Chess DApp</title>
   <style>
-    body { font-family: Arial, sans-serif; margin:0; padding:0; background:#f5f5f5; text-align:center; }
-    header, footer { background:#1f1f1f; color:white; padding:10px 0; }
-    header img, footer img { height:40px; margin:0 10px; vertical-align:middle; }
+    body { font-family: Arial,sans-serif; background:#f5f5f5; text-align:center; margin:0; padding:0; }
+    header, footer { background:#1f1f1f; color:#fff; padding:10px 0; }
+    header img, footer a { margin:0 10px; vertical-align:middle; }
     .container { padding:20px; }
-    button { padding:10px 20px; font-size:16px; margin:10px; cursor:pointer; }
+    button { padding:10px 20px; margin:5px; cursor:pointer; }
     #board { display:grid; grid-template-columns:repeat(8,50px); grid-template-rows:repeat(8,50px); margin:20px auto; }
     .cell { width:50px; height:50px; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; }
     .white { background:#eee; }
-    .black { background:#888; color:white; }
-    a { color:#4da6ff; text-decoration:none; margin:0 10px; }
+    .black { background:#888; color:#fff; }
     #status { margin-top:10px; font-weight:bold; }
   </style>
 </head>
 <body>
+  <header>
+    <img src="fox_logo.png" alt="Fox Logo" height="40">
+    <img src="monad_logo.png" alt="Monad Logo" height="40">
+  </header>
 
-<header>
-  <img src="fox_logo.png" alt="Fox Logo">
-  <img src="monad_logo.png" alt="Monad Logo">
-</header>
+  <div class="container">
+    <h1>Monad Chess DApp</h1>
+    <button id="connectBtn">Connect Wallet</button>
+    <button id="createBtn">Create Game</button>
+    <div id="status">Wallet not connected</div>
+    <div id="board"></div>
+  </div>
 
-<div class="container">
-  <h1>Monad Chess DApp</h1>
-  <button id="connectBtn">Connect Wallet</button>
-  <button id="createBtn">Create Game</button>
-  <div id="status">Wallet not connected</div>
-  <div id="board"></div>
-</div>
+  <footer>
+    <p>Follow me:</p>
+    <a href="https://t.me/pawansatoshiji" target="_blank">Telegram</a>
+    <a href="https://youtube.com/@PawanSatoshi" target="_blank">YouTube</a>
+    <a href="https://x.com/pawansatoshix" target="_blank">X</a>
+    <span>Discord: @pawansatoshi</span>
+  </footer>
 
-<footer>
-  <p>Follow me:</p>
-  <a href="https://t.me/pawansatoshiji" target="_blank">Telegram</a>
-  <a href="https://youtube.com/@PawanSatoshi" target="_blank">YouTube</a>
-  <a href="https://x.com/pawansatoshix" target="_blank">X (Twitter)</a>
-  <span>Discord: @pawansatoshi</span>
-</footer>
+  <!-- Use ethers.js v5 -->
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
 
-<!-- Ethers.js v5 -->
-<script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
-<script>
-  const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
+  <script>
+    // Network parameters for Monad Testnet
+    const MONAD_PARAMS = {
+      chainId: '0x27F3', // hex of 10143
+      chainName: 'Monad Testnet',
+      rpcUrls: ['https://testnet-rpc.monad.xyz'],
+      nativeCurrency: { name: 'Monad', symbol: 'MON', decimals: 18 },
+      blockExplorerUrls: ['https://testnet.monadexplorer.com']
+    };
 
-  const contractABI = [
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"white","type":"address"}],"name":"GameCreated","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"GameFinished","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"string","name":"move","type":"string"},{"indexed":false,"internalType":"uint256","name":"moveIndex","type":"uint256"},{"indexed":false,"internalType":"uint8","name":"nextTurn","type":"uint8"}],"name":"MoveSubmitted","type":"event"},
-    {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"black","type":"address"}],"name":"PlayerJoined","type":"event"},
-    {"inputs":[],"name":"createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],"name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
-    {"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-    {"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
-  ];
+    const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
+    const contractABI = [ /* Your full ABI here (as before) */ ];
 
-  let provider, signer, contract, currentGameId;
-  let selectedCell = null;
+    let provider, signer, contract, currentGameId, selectedCell;
+    const boardState = [
+      ['r','n','b','q','k','b','n','r'],
+      ['p','p','p','p','p','p','p','p'],
+      Array(8).fill(''),
+      Array(8).fill(''),
+      Array(8).fill(''),
+      Array(8).fill(''),
+      Array(8).fill('P'),
+      ['R','N','B','Q','K','B','N','R']
+    ];
+    const pieces = {'r':'♜','n':'♞','b':'♝','q':'♛','k':'♚','p':'♟','R':'♖','N':'♘','B':'♗','Q':'♕','K':'♔','P':'♙'};
 
-  async function connectWallet() {
-    if (!window.ethereum) { alert("Please install MetaMask!"); return; }
-    provider = new ethers.providers.Web3Provider(window.ethereum);
-    await provider.send("eth_requestAccounts", []);
-    signer = provider.getSigner();
-    contract = new ethers.Contract(contractAddress, contractABI, signer);
-    document.getElementById("status").innerText = "Wallet connected!";
-  }
-
-  async function createGame() {
-    if (!contract) { alert("Connect wallet first!"); return; }
-    try {
-      const tx = await contract.createGame();
-      const receipt = await tx.wait();
-      const event = receipt.events.find(e => e.event === "GameCreated");
-      currentGameId = event.args.gameId.toNumber();
-      document.getElementById("status").innerText = `Game created! ID: ${currentGameId}`;
-    } catch (err) {
-      console.error(err);
-      alert("Error creating game: " + err.message);
-    }
-  }
-
-  document.getElementById("connectBtn").addEventListener("click", connectWallet);
-  document.getElementById("createBtn").addEventListener("click", createGame);
-
-  // ===== Chess Board =====
-  const boardElement = document.getElementById("board");
-  const rows = 8, cols = 8;
-
-  const pieces = {
-    'r': '♜','n': '♞','b': '♝','q': '♛','k': '♚','p': '♟',
-    'R': '♖','N': '♘','B': '♗','Q': '♕','K': '♔','P': '♙'
-  };
-
-  let board = [
-    ['r','n','b','q','k','b','n','r'],
-    ['p','p','p','p','p','p','p','p'],
-    ['','','','','','','',''],
-    ['','','','','','','',''],
-    ['','','','','','','',''],
-    ['','','','','','','',''],
-    ['P','P','P','P','P','P','P','P'],
-    ['R','N','B','Q','K','B','N','R']
-  ];
-
-  function renderBoard() {
-    boardElement.innerHTML = '';
-    for (let i=0;i<rows;i++){
-      for (let j=0;j<cols;j++){
-        const cell = document.createElement("div");
-        cell.className = 'cell ' + ((i+j)%2===0?'white':'black');
-        cell.dataset.row=i;
-        cell.dataset.col=j;
-        cell.innerText = pieces[board[i][j]] || '';
-        cell.addEventListener("click", handleCellClick);
-        boardElement.appendChild(cell);
+    async function connectWallet() {
+      if (!window.ethereum) return alert("Install MetaMask");
+      try {
+        // Request the wallet to switch to Monad Testnet
+        await window.ethereum.request({
+          method: "wallet_addEthereumChain",
+          params: [MONAD_PARAMS]
+        });
+      } catch (err) {
+        console.warn("Add chain request rejected or already added.");
       }
+      provider = new ethers.providers.Web3Provider(window.ethereum, "any");
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      contract = new ethers.Contract(contractAddress, contractABI, signer);
+      document.getElementById("status").innerText = "Wallet connected!";
     }
-  }
 
-  async function handleCellClick(event){
-    const row = parseInt(event.target.dataset.row);
-    const col = parseInt(event.target.dataset.col);
-
-    if(!currentGameId){ alert("Create a game first!"); return; }
-
-    if(selectedCell){
-      const [prevRow,prevCol] = selectedCell;
-      const moveString = `${prevRow},${prevCol}->${row},${col}`;
-      board[row][col] = board[prevRow][prevCol];
-      board[prevRow][prevCol] = '';
-      renderBoard();
-      selectedCell = null;
-
-      try{
-        const tx = await contract.submitMove(currentGameId, moveString);
-        await tx.wait();
-        document.getElementById("status").innerText = `Move submitted: ${moveString}`;
-      }catch(err){
+    async function createGame() {
+      if (!contract) return alert("Connect wallet first");
+      try {
+        const tx = await contract.createGame();
+        const receipt = await tx.wait();
+        const e = receipt.events.find(e => e.event === "GameCreated");
+        currentGameId = e.args.gameId.toString();
+        document.getElementById("status").innerText = `Game created! ID: ${currentGameId}`;
+      } catch (err) {
         console.error(err);
-        alert("Error submitting move: " + err.message);
+        alert("Error creating game");
       }
-    } else {
-      selectedCell = [row,col];
     }
-  }
 
-  window.onload = renderBoard;
-</script>
+    document.getElementById("connectBtn").onclick = connectWallet;
+    document.getElementById("createBtn").onclick = createGame;
+
+    function renderBoard() {
+      const board = document.getElementById("board");
+      board.innerHTML = "";
+      boardState.forEach((row, i) => row.forEach((p, j) => {
+        const cell = document.createElement("div");
+        cell.className = 'cell ' + ((i+j)%2 ? 'black' : 'white');
+        cell.dataset.row = i; cell.dataset.col = j;
+        cell.innerText = pieces[p] || '';
+        cell.onclick = handleCellClick;
+        board.appendChild(cell);
+      }));
+    }
+
+    async function handleCellClick(e) {
+      const row = +e.target.dataset.row, col = +e.target.dataset.col;
+      if (!currentGameId) return alert("Create a game first");
+      if (selectedCell) {
+        const [pr, pc] = selectedCell;
+        const move = `${pr},${pc}->${row},${col}`;
+        boardState[row][col] = boardState[pr][pc];
+        boardState[pr][pc] = '';
+        renderBoard(); selectedCell = null;
+        try {
+          await (await contract.submitMove(currentGameId, move)).wait();
+          document.getElementById("status").innerText = `Move sent: ${move}`;
+        } catch (err) {
+          console.error(err); alert("Move tx error");
+        }
+      } else {
+        selectedCell = [row, col];
+      }
+    }
+
+    window.onload = renderBoard;
+  </script>
 </body>
 </html>
