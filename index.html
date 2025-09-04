@@ -5,17 +5,48 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Monad Chess Testnet</title>
 <style>
-  body { font-family: Arial, sans-serif; background: #111; color: #eee; display: flex; flex-direction: column; align-items: center; padding: 20px; }
-  #board { display: grid; grid-template-columns: repeat(8, 50px); grid-template-rows: repeat(8, 50px); gap: 0; margin-bottom: 20px; }
-  .square { width: 50px; height: 50px; display: flex; justify-content: center; align-items: center; font-size: 30px; cursor: pointer; }
+  body {
+    font-family: Arial, "Segoe UI Symbol", "Noto Sans Symbols", sans-serif;
+    background: url('your_background_image.png') no-repeat center center fixed;
+    background-size: cover;
+    color: #eee;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 20px;
+    position: relative;
+  }
+  #board { 
+    display: grid; 
+    grid-template-columns: repeat(8, 50px); 
+    grid-template-rows: repeat(8, 50px); 
+    gap: 0; 
+    margin-bottom: 20px; 
+  }
+  .square { 
+    width: 50px; height: 50px; 
+    display: flex; justify-content: center; align-items: center; 
+    font-size: 36px; cursor: pointer; 
+  }
   .white { background-color: #f0d9b5; }
   .black { background-color: #b58863; }
-  button { margin: 5px; padding: 10px 15px; font-size: 16px; cursor: pointer; border-radius: 5px; border: none; background: #4CAF50; color: #fff; }
+  button { 
+    margin: 5px; padding: 10px 15px; font-size: 16px; cursor: pointer; 
+    border-radius: 5px; border: none; background: #4CAF50; color: #fff; 
+  }
   button:disabled { background: #555; cursor: not-allowed; }
   #moves, #leaderboard { margin-top: 15px; max-width: 400px; width: 100%; word-break: break-word; }
+  #socials a { margin: 0 5px; text-decoration: none; font-weight: bold; }
+  #socials { margin-top: 20px; text-align: center; }
+  img.logo { width: 80px; position: absolute; top: 10px; }
+  #monadLogo { left: 10px; }
+  #foxLogo { right: 10px; }
 </style>
 </head>
 <body>
+
+<img src="monad_logo.png" id="monadLogo" class="logo" alt="Monad Logo">
+<img src="fox_logo.png" id="foxLogo" class="logo" alt="Fox Logo">
 
 <h1>Monad Chess Testnet ♟️</h1>
 
@@ -31,91 +62,115 @@
 <div id="moves">Moves:</div>
 <div id="leaderboard">Leaderboard:</div>
 
+<div id="socials">
+  <a href="https://t.me/pawansatoshiji" target="_blank" style="color:#0088cc;">Telegram</a> |
+  <a href="https://youtube.com/@PawanSatoshi" target="_blank" style="color:#FF0000;">YouTube</a> |
+  <a href="https://x.com/pawansatoshix" target="_blank" style="color:#1DA1F2;">X</a> |
+  <a href="https://discord.com/users/pawansatoshi" target="_blank" style="color:#7289DA;">Discord</a>
+</div>
+
 <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.min.js"></script>
 <script>
 const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
-const contractABI = /* ABI you provided */ [
-	{
-		"anonymous": false,
-		"inputs": [
-			{"indexed": true,"internalType": "uint256","name": "gameId","type": "uint256"},
-			{"indexed": true,"internalType": "address","name": "white","type": "address"}
-		],
-		"name": "GameCreated","type": "event"
-	},
-	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"GameFinished","type":"event"},
-	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"player","type":"address"},{"indexed":false,"internalType":"string","name":"move","type":"string"},{"indexed":false,"internalType":"uint256","name":"moveIndex","type":"uint256"},{"indexed":false,"internalType":"uint8","name":"nextTurn","type":"uint8"}],"name":"MoveSubmitted","type":"event"},
-	{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"black","type":"address"}],"name":"PlayerJoined","type":"event"},
-	{"inputs":[],"name":"createGame","outputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"address","name":"winner","type":"address"}],"name":"finishGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getMoves","outputs":[{"internalType":"string[]","name":"","type":"string[]"}],"stateMutability":"view","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getPlayers","outputs":[{"internalType":"address","name":"white","type":"address"},{"internalType":"address","name":"black","type":"address"}],"stateMutability":"view","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"getState","outputs":[{"internalType":"bool","name":"started","type":"bool"},{"internalType":"bool","name":"finished","type":"bool"},{"internalType":"address","name":"winner","type":"address"},{"internalType":"uint8","name":"turn","type":"uint8"},{"internalType":"uint256","name":"moveCount","type":"uint256"}],"stateMutability":"view","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"}],"name":"joinGame","outputs":[],"stateMutability":"nonpayable","type":"function"},
-	{"inputs":[],"name":"nextGameId","outputs":[{"internalType":"uint256","name":"","type":"uint256"}],"stateMutability":"view","type":"function"},
-	{"inputs":[{"internalType":"uint256","name":"gameId","type":"uint256"},{"internalType":"string","name":"move","type":"string"}],"name":"submitMove","outputs":[],"stateMutability":"nonpayable","type":"function"}
-];
+const contractABI = [ /* ABI here as before */ ];
 
 let provider, signer, contract, currentGameId;
 let board = [];
+let selected = null;
+let movesLog = [];
 
 function initBoard() {
-	board = [];
-	const boardDiv = document.getElementById('board');
-	boardDiv.innerHTML = '';
-	const rows = 8, cols = 8;
-	const initialPieces = [
-		["♜","♞","♝","♛","♚","♝","♞","♜"],
-		["♟","♟","♟","♟","♟","♟","♟","♟"],
-		["","","","","","","",""],
-		["","","","","","","",""],
-		["","","","","","","",""],
-		["","","","","","","",""],
-		["♙","♙","♙","♙","♙","♙","♙","♙"],
-		["♖","♘","♗","♕","♔","♗","♘","♖"]
-	];
-	for(let r=0;r<rows;r++){
-		let rowArr = [];
-		for(let c=0;c<cols;c++){
-			const square = document.createElement('div');
-			square.className = ((r+c)%2===0)?"square white":"square black";
-			square.textContent = initialPieces[r][c];
-			boardDiv.appendChild(square);
-			rowArr.push(square);
-		}
-		board.push(rowArr);
-	}
+  board = [];
+  const boardDiv = document.getElementById('board');
+  boardDiv.innerHTML = '';
+  const rows = 8, cols = 8;
+  const initialPieces = [
+    ["♜","♞","♝","♛","♚","♝","♞","♜"],
+    ["♟","♟","♟","♟","♟","♟","♟","♟"],
+    ["","","","","","","",""],
+    ["","","","","","","",""],
+    ["","","","","","","",""],
+    ["","","","","","","",""],
+    ["♙","♙","♙","♙","♙","♙","♙","♙"],
+    ["♖","♘","♗","♕","♔","♗","♘","♖"]
+  ];
+  for(let r=0;r<rows;r++){
+    let rowArr = [];
+    for(let c=0;c<cols;c++){
+      const square = document.createElement('div');
+      square.className = ((r+c)%2===0)?"square white":"square black";
+      square.textContent = initialPieces[r][c];
+      square.onclick = () => handleClick(square, r, c);
+      boardDiv.appendChild(square);
+      rowArr.push(square);
+    }
+    board.push(rowArr);
+  }
+  updateLeaderboard();
+}
+
+function handleClick(square, r, c) {
+  if(selected){
+    if(selected !== square){
+      const move = `${selected.textContent} ${r},${c}`;
+      board[r][c].textContent = selected.textContent;
+      selected.textContent = "";
+      movesLog.push(move);
+      document.getElementById('moves').textContent = "Moves: " + movesLog.join(", ");
+      // Placeholder: submit move to contract
+      // contract.submitMove(currentGameId, move);
+    }
+    selected = null;
+  } else if(square.textContent){
+    selected = square;
+  }
 }
 
 async function connectWallet() {
-	if(!window.ethereum) return alert("Install MetaMask!");
-	provider = new ethers.BrowserProvider(window.ethereum);
-	await provider.send("eth_requestAccounts", []);
-	signer = await provider.getSigner();
-	contract = new ethers.Contract(contractAddress, contractABI, signer);
-	document.getElementById('createGame').disabled = false;
-	document.getElementById('joinGame').disabled = false;
-	initBoard();
+  if(!window.ethereum) return alert("Install MetaMask!");
+  provider = new ethers.BrowserProvider(window.ethereum);
+  await provider.send("eth_requestAccounts", []);
+  signer = await provider.getSigner();
+  contract = new ethers.Contract(contractAddress, contractABI, signer);
+  document.getElementById('createGame').disabled = false;
+  document.getElementById('joinGame').disabled = false;
+  initBoard();
 }
 
 async function createGame() {
-	const tx = await contract.createGame();
-	const receipt = await tx.wait();
-	const gameId = await contract.nextGameId() - 1; 
-	currentGameId = gameId;
-	alert(`Game created with ID: ${gameId}`);
-	document.getElementById('undoMove').disabled = false;
+  const tx = await contract.createGame();
+  const receipt = await tx.wait();
+  const event = receipt.events.find(e => e.event === "GameCreated");
+  currentGameId = event.args.gameId;
+  alert(`Game created with ID: ${currentGameId}`);
+  document.getElementById('undoMove').disabled = false;
+  updateLeaderboard();
 }
 
 async function joinGame() {
-	if(!currentGameId) currentGameId = (await contract.nextGameId()) - 1;
-	await contract.joinGame(currentGameId);
-	alert("Joined Game as Black ✅");
-	document.getElementById('undoMove').disabled = false;
+  if(!currentGameId) currentGameId = (await contract.nextGameId()) - 1;
+  try {
+    await contract.joinGame(currentGameId);
+    alert("Joined Game as Black ✅");
+    document.getElementById('undoMove').disabled = false;
+    updateLeaderboard();
+  } catch(err) {
+    alert("Error joining game: " + err.message);
+  }
 }
 
-async function undoMove() {
-	alert("Undo feature requires smart contract support.");
+function undoMove() {
+  alert("Undo feature requires smart contract support.");
+}
+
+async function updateLeaderboard() {
+  if(!contract || !currentGameId) return;
+  try {
+    const players = await contract.getPlayers(currentGameId);
+    document.getElementById('leaderboard').textContent = `Leaderboard: White: ${players.white}, Black: ${players.black}`;
+  } catch {
+    document.getElementById('leaderboard').textContent = "Leaderboard: Waiting for game...";
+  }
 }
 
 document.getElementById('connectWallet').onclick = connectWallet;
@@ -126,4 +181,4 @@ document.getElementById('undoMove').onclick = undoMove;
 initBoard();
 </script>
 </body>
-</html>
+	</html>
