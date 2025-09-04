@@ -9,11 +9,11 @@
     header, footer { background:#1f1f1f; color:white; padding:10px 0; }
     header img, footer img { height:40px; margin:0 10px; vertical-align:middle; }
     .container { padding:20px; }
-    button { padding:10px 20px; font-size:16px; margin:10px; cursor:pointer; border-radius:6px; }
-    #board { display:grid; grid-template-columns:repeat(8,50px); grid-template-rows:repeat(8,50px); margin:20px auto; box-shadow:0 0 10px rgba(0,0,0,0.2); }
+    button { padding:10px 20px; font-size:16px; margin:10px; cursor:pointer; }
+    #board { display:grid; grid-template-columns:repeat(8,50px); grid-template-rows:repeat(8,50px); margin:20px auto; }
     .cell { width:50px; height:50px; display:flex; align-items:center; justify-content:center; font-size:24px; cursor:pointer; }
     .white { background:#eee; }
-    .black { background:#555; color:white; }
+    .black { background:#888; color:white; }
     a { color:#4da6ff; text-decoration:none; margin:0 10px; }
     #status { margin-top:10px; font-weight:bold; }
   </style>
@@ -41,11 +41,12 @@
   <span>Discord: @pawansatoshi</span>
 </footer>
 
-<script type="module">
-  import { ethers } from "https://cdn.ethers.io/lib/ethers-6.6.0.esm.min.js";
+<!-- Ethers.js v5 (stable) -->
+<script src="https://cdn.ethers.io/lib/ethers-5.2.umd.min.js" type="application/javascript"></script>
 
-  // === YOUR CONTRACT SETUP ===
+<script>
   const contractAddress = "0x927E5DF0b0a5971cA625051C4116A2515525dCEb";
+
   const contractABI = [
     {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"white","type":"address"}],"name":"GameCreated","type":"event"},
     {"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint256","name":"gameId","type":"uint256"},{"indexed":true,"internalType":"address","name":"winner","type":"address"}],"name":"GameFinished","type":"event"},
@@ -63,13 +64,18 @@
 
   let provider, signer, contract, currentGameId;
 
-  // === Connect wallet ===
   async function connectWallet() {
-    if (!window.ethereum) { alert("Please install MetaMask!"); return; }
-    provider = new ethers.BrowserProvider(window.ethereum);
-    signer = await provider.getSigner();
-    contract = new ethers.Contract(contractAddress, contractABI, signer);
-    document.getElementById("status").innerText = "Wallet connected!";
+    try {
+      if (!window.ethereum) { alert("Please install MetaMask!"); return; }
+      provider = new ethers.providers.Web3Provider(window.ethereum);
+      await provider.send("eth_requestAccounts", []);
+      signer = provider.getSigner();
+      contract = new ethers.Contract(contractAddress, contractABI, signer);
+      document.getElementById("status").innerText = "Wallet connected!";
+    } catch (err) {
+      console.error(err);
+      alert("Wallet connection error: " + err.message);
+    }
   }
 
   async function createGame() {
@@ -77,8 +83,8 @@
     try {
       const tx = await contract.createGame();
       const receipt = await tx.wait();
-      const event = receipt.logs.find(x => x.fragment?.name === "GameCreated");
-      currentGameId = event.args.gameId.toString();
+      const event = receipt.events.find(e => e.event === "GameCreated");
+      currentGameId = event.args.gameId.toNumber();
       document.getElementById("status").innerText = `Game created! ID: ${currentGameId}`;
     } catch (err) {
       console.error(err);
@@ -89,7 +95,7 @@
   document.getElementById("connectBtn").addEventListener("click", connectWallet);
   document.getElementById("createBtn").addEventListener("click", createGame);
 
-  // === Chess board ===
+  // ===== Chess Board =====
   const boardElement = document.getElementById("board");
   const rows = 8, cols = 8;
   let selectedCell = null;
@@ -148,18 +154,14 @@
         alert("Error submitting move: " + err.message);
       }
     } else {
-      selectedCell = [row,col];
+      if(board[row][col] !== ''){
+        selectedCell = [row,col];
+      }
     }
   }
 
-  renderBoard();
-
-  // === AI WALLET (for server-side scripts, not browser) ===
-  // Example private key you shared - NEVER expose in public frontend.
-  // const AI_PRIVATE_KEY = "0xe899225a15a4c31e373d2c3dcf9f567903c90817c3af31cd2dd9b22c9e6a0f3c";
-  // const aiWallet = new ethers.Wallet(AI_PRIVATE_KEY, provider);
-  // const aiContract = new ethers.Contract(contractAddress, contractABI, aiWallet);
-
+  // Render the board immediately when page loads
+  window.onload = renderBoard;
 </script>
 </body>
 </html>
